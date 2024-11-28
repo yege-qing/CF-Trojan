@@ -136,23 +136,7 @@ export default {
 					let pagesSum = UD;
 					let workersSum = UD;
 					let total = 24 * 1099511627776 ;
-					if (env.CFEMAIL && env.CFKEY){
-						const email = env.CFEMAIL;
-						const key = env.CFKEY;
-						const accountIndex = env.CFID || 0;
-						const accountId = await getAccountId(email, key);
-						if (accountId){
-							const now = new Date()
-							now.setUTCHours(0, 0, 0, 0)
-							const startDate = now.toISOString()
-							const endDate = new Date().toISOString();
-							const Sum = await getSum(accountId, accountIndex, email, key, startDate, endDate);
-							pagesSum = Sum[0];
-							workersSum = Sum[1];
-							total = 102400 ;
-						}
-					}
-					//console.log(`pagesSum: ${pagesSum}\nworkersSum: ${workersSum}\ntotal: ${total}`);
+
 					if (userAgent && (userAgent.includes('mozilla') || userAgent.includes('subconverter'))){
 						return new Response(`${trojanConfig}`, {
 							status: 200,

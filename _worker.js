@@ -65,7 +65,7 @@ export default {
 					}
 				});
 			}
-			sha224Password = env.SHA224 || env.SHA224PASS || sha256.sha224(password);
+			sha224Password = env.SHA224 || env.SHA224PASS || sha224(password);
 			//console.log(sha224Password);
 
 			const currentDate = new Date();
@@ -1376,8 +1376,8 @@ function surge(content, url) {
 	};
   
 	var nodeWrap = function (method, is224) {
-	  var crypto = require('node:crypto')
-	  var Buffer = require('node:buffer').Buffer;
+	  var crypto = require('crypto')
+	  var Buffer = require('buffer').Buffer;
 	  var algorithm = is224 ? 'sha224' : 'sha256';
 	  var bufferFrom;
 	  if (Buffer.from && !root.JS_SHA256_NO_BUFFER_FROM) {
@@ -1802,21 +1802,28 @@ function surge(content, url) {
 	  }
 	};
   
-	var exports = createMethod();
-	exports.sha256 = exports;
-	exports.sha224 = createMethod(true);
-	exports.sha256.hmac = createHmacMethod();
-	exports.sha224.hmac = createHmacMethod(true);
-  
-	if (COMMON_JS) {
-	  module.exports = exports;
-	} else {
-	  root.sha256 = exports.sha256;
-	  root.sha224 = exports.sha224;
-	  if (AMD) {
-		define(function () {
-		  return exports;
-		});
+	function createSha224() {
+		var sha224 = createMethod(true);
+		sha224.hmac = createHmacMethod(true);
+		return sha224;
 	  }
-	}
+	  
+	  // 使用示例
+	  const sha224 = createSha224();
+	  
+	  // 如果需要导出
+	  if (COMMON_JS) {
+		module.exports = {
+		  sha224: sha224
+		};
+	  } else {
+		root.sha224 = sha224;
+		if (AMD) {
+		  define(function () {
+			return {
+			  sha224: sha224
+			};
+		  });
+		}
+	  }
 })();

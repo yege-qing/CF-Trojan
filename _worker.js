@@ -65,7 +65,7 @@ export default {
 					}
 				});
 			}
-			sha224Password = env.SHA224 || env.SHA224PASS || createSha224(password);
+			sha224Password = env.SHA224 || env.SHA224PASS || sha224(password);
 			//console.log(sha224Password);
 
 			const currentDate = new Date();
@@ -1808,6 +1808,8 @@ function surge(content, url) {
 		return sha224;
 	  }
 	  
+	  const sha224 = createSha224();
+
 	  if (COMMON_JS) {
 		module.exports = {
 		  sha224: sha224

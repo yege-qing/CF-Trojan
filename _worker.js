@@ -1377,7 +1377,7 @@ function surge(content, url) {
   
 	var nodeWrap = function (method, is224) {
 	  var crypto = require('node:crypto')
-	  var Buffer = require('buffer').Buffer;
+	  var Buffer = require('node:buffer').Buffer;
 	  var algorithm = is224 ? 'sha224' : 'sha256';
 	  var bufferFrom;
 	  if (Buffer.from && !root.JS_SHA256_NO_BUFFER_FROM) {

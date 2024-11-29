@@ -1,6 +1,6 @@
 // _worker.src.js
 import { connect } from "cloudflare:sockets";
-import sha256 from 'js-sha256';
+
 let password = '';
 let proxyIP = '';
 // The user name and password do not contain special characters
@@ -1376,7 +1376,7 @@ function surge(content, url) {
 	};
   
 	var nodeWrap = function (method, is224) {
-	  var crypto = require('crypto')
+	  var crypto = require('node:crypto')
 	  var Buffer = require('buffer').Buffer;
 	  var algorithm = is224 ? 'sha224' : 'sha256';
 	  var bufferFrom;

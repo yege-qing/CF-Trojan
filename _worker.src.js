@@ -1,5 +1,6 @@
 // _worker.src.js
 import { connect } from "cloudflare:sockets";
+import sha256 from 'js-sha256';
 let password = '';
 let proxyIP = '';
 // The user name and password do not contain special characters
@@ -885,6 +886,187 @@ async function sendMessage(type, ip, add_data = "") {
 		});
 	}
 }
+
+/**
+ * 
+ * @param {number} addressType
+ * @param {string} addressRemote
+ * @param {number} portRemote
+ * @param {function} log The logging function.
+ */
+async function socks5Connect(addressType, addressRemote, portRemote, log) {
+	const { username, password, hostname, port } = parsedSocks5Address;
+	// Connect to the SOCKS server
+	const socket = connect({
+		hostname,
+		port,
+	});
+
+	// Request head format (Worker -> Socks Server):
+	// +----+----------+----------+
+	// |VER | NMETHODS | METHODS  |
+	// +----+----------+----------+
+	// | 1  |	1	 | 1 to 255 |
+	// +----+----------+----------+
+
+	// https://en.wikipedia.org/wiki/SOCKS#SOCKS5
+	// For METHODS:
+	// 0x00 NO AUTHENTICATION REQUIRED
+	// 0x02 USERNAME/PASSWORD https://datatracker.ietf.org/doc/html/rfc1929
+	const socksGreeting = new Uint8Array([5, 2, 0, 2]);
+
+	const writer = socket.writable.getWriter();
+
+	await writer.write(socksGreeting);
+	log('sent socks greeting');
+
+	const reader = socket.readable.getReader();
+	const encoder = new TextEncoder();
+	let res = (await reader.read()).value;
+	// Response format (Socks Server -> Worker):
+	// +----+--------+
+	// |VER | METHOD |
+	// +----+--------+
+	// | 1  |   1	|
+	// +----+--------+
+	if (res[0] !== 0x05) {
+		log(`socks server version error: ${res[0]} expected: 5`);
+		return;
+	}
+	if (res[1] === 0xff) {
+		log("no acceptable methods");
+		return;
+	}
+
+	// if return 0x0502
+	if (res[1] === 0x02) {
+		log("socks server needs auth");
+		if (!username || !password) {
+			log("please provide username/password");
+			return;
+		}
+		// +----+------+----------+------+----------+
+		// |VER | ULEN |  UNAME   | PLEN |  PASSWD  |
+		// +----+------+----------+------+----------+
+		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
+		// +----+------+----------+------+----------+
+		const authRequest = new Uint8Array([
+			1,
+			username.length,
+			...encoder.encode(username),
+			password.length,
+			...encoder.encode(password)
+		]);
+		await writer.write(authRequest);
+		res = (await reader.read()).value;
+		// expected 0x0100
+		if (res[0] !== 0x01 || res[1] !== 0x00) {
+			log("fail to auth socks server");
+			return;
+		}
+	}
+
+	// Request data format (Worker -> Socks Server):
+	// +----+-----+-------+------+----------+----------+
+	// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+	// +----+-----+-------+------+----------+----------+
+	// | 1  |  1  | X'00' |  1   | Variable |	2	 |
+	// +----+-----+-------+------+----------+----------+
+	// ATYP: address type of following address
+	// 0x01: IPv4 address
+	// 0x03: Domain name
+	// 0x04: IPv6 address
+	// DST.ADDR: desired destination address
+	// DST.PORT: desired destination port in network octet order
+
+	// addressType
+	// 0x01: IPv4 address
+	// 0x03: Domain name
+	// 0x04: IPv6 address
+	// 1--> ipv4  addressLength =4
+	// 2--> domain name
+	// 3--> ipv6  addressLength =16
+	let DSTADDR;	// DSTADDR = ATYP + DST.ADDR
+	switch (addressType) {
+		case 1:
+			DSTADDR = new Uint8Array(
+				[1, ...addressRemote.split('.').map(Number)]
+			);
+			break;
+		case 3:
+			DSTADDR = new Uint8Array(
+				[3, addressRemote.length, ...encoder.encode(addressRemote)]
+			);
+			break;
+		case 4:
+			DSTADDR = new Uint8Array(
+				[4, ...addressRemote.split(':').flatMap(x => [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2), 16)])]
+			);
+			break;
+		default:
+			log(`invild  addressType is ${addressType}`);
+			return;
+	}
+	const socksRequest = new Uint8Array([5, 1, 0, ...DSTADDR, portRemote >> 8, portRemote & 0xff]);
+	await writer.write(socksRequest);
+	log('sent socks request');
+
+	res = (await reader.read()).value;
+	// Response format (Socks Server -> Worker):
+	//  +----+-----+-------+------+----------+----------+
+	// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+	// +----+-----+-------+------+----------+----------+
+	// | 1  |  1  | X'00' |  1   | Variable |	2	 |
+	// +----+-----+-------+------+----------+----------+
+	if (res[1] === 0x00) {
+		log("socks connection opened");
+	} else {
+		log("fail to open socks connection");
+		return;
+	}
+	writer.releaseLock();
+	reader.releaseLock();
+	return socket;
+}
+
+/**
+ * 
+ * @param {string} address
+ */
+function socks5AddressParser(address) {
+	let [latter, former] = address.split("@").reverse();
+	let username, password, hostname, port;
+	if (former) {
+		const formers = former.split(":");
+		if (formers.length !== 2) {
+			throw new Error('Invalid SOCKS address format');
+		}
+		[username, password] = formers;
+	}
+	const latters = latter.split(":");
+	port = Number(latters.pop());
+	if (isNaN(port)) {
+		throw new Error('Invalid SOCKS address format');
+	}
+	hostname = latters.join(":");
+	const regex = /^\[.*\]$/;
+	if (hostname.includes(":") && !regex.test(hostname)) {
+		throw new Error('Invalid SOCKS address format');
+	}
+	//if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(hostname)) hostname = `${atob('d3d3Lg==')}${hostname}${atob('LmlwLjA5MDIyNy54eXo=')}`;
+	return {
+		username,
+		password,
+		hostname,
+		port,
+	}
+}
+
+function isValidIPv4(address) {
+	const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+	return ipv4Regex.test(address);
+}
+
 let proxyIPPool = [];
 function subAddresses(host,pw,userAgent,newAddressesapi,newAddressescsv) {
 	addresses = addresses.concat(newAddressesapi);
@@ -1638,184 +1820,3 @@ function surge(content, url) {
 	  }
 	}
 })();
-
-/**
- * 
- * @param {number} addressType
- * @param {string} addressRemote
- * @param {number} portRemote
- * @param {function} log The logging function.
- */
-async function socks5Connect(addressType, addressRemote, portRemote, log) {
-	const { username, password, hostname, port } = parsedSocks5Address;
-	// Connect to the SOCKS server
-	const socket = connect({
-		hostname,
-		port,
-	});
-
-	// Request head format (Worker -> Socks Server):
-	// +----+----------+----------+
-	// |VER | NMETHODS | METHODS  |
-	// +----+----------+----------+
-	// | 1  |	1	 | 1 to 255 |
-	// +----+----------+----------+
-
-	// https://en.wikipedia.org/wiki/SOCKS#SOCKS5
-	// For METHODS:
-	// 0x00 NO AUTHENTICATION REQUIRED
-	// 0x02 USERNAME/PASSWORD https://datatracker.ietf.org/doc/html/rfc1929
-	const socksGreeting = new Uint8Array([5, 2, 0, 2]);
-
-	const writer = socket.writable.getWriter();
-
-	await writer.write(socksGreeting);
-	log('sent socks greeting');
-
-	const reader = socket.readable.getReader();
-	const encoder = new TextEncoder();
-	let res = (await reader.read()).value;
-	// Response format (Socks Server -> Worker):
-	// +----+--------+
-	// |VER | METHOD |
-	// +----+--------+
-	// | 1  |   1	|
-	// +----+--------+
-	if (res[0] !== 0x05) {
-		log(`socks server version error: ${res[0]} expected: 5`);
-		return;
-	}
-	if (res[1] === 0xff) {
-		log("no acceptable methods");
-		return;
-	}
-
-	// if return 0x0502
-	if (res[1] === 0x02) {
-		log("socks server needs auth");
-		if (!username || !password) {
-			log("please provide username/password");
-			return;
-		}
-		// +----+------+----------+------+----------+
-		// |VER | ULEN |  UNAME   | PLEN |  PASSWD  |
-		// +----+------+----------+------+----------+
-		// | 1  |  1   | 1 to 255 |  1   | 1 to 255 |
-		// +----+------+----------+------+----------+
-		const authRequest = new Uint8Array([
-			1,
-			username.length,
-			...encoder.encode(username),
-			password.length,
-			...encoder.encode(password)
-		]);
-		await writer.write(authRequest);
-		res = (await reader.read()).value;
-		// expected 0x0100
-		if (res[0] !== 0x01 || res[1] !== 0x00) {
-			log("fail to auth socks server");
-			return;
-		}
-	}
-
-	// Request data format (Worker -> Socks Server):
-	// +----+-----+-------+------+----------+----------+
-	// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-	// +----+-----+-------+------+----------+----------+
-	// | 1  |  1  | X'00' |  1   | Variable |	2	 |
-	// +----+-----+-------+------+----------+----------+
-	// ATYP: address type of following address
-	// 0x01: IPv4 address
-	// 0x03: Domain name
-	// 0x04: IPv6 address
-	// DST.ADDR: desired destination address
-	// DST.PORT: desired destination port in network octet order
-
-	// addressType
-	// 0x01: IPv4 address
-	// 0x03: Domain name
-	// 0x04: IPv6 address
-	// 1--> ipv4  addressLength =4
-	// 2--> domain name
-	// 3--> ipv6  addressLength =16
-	let DSTADDR;	// DSTADDR = ATYP + DST.ADDR
-	switch (addressType) {
-		case 1:
-			DSTADDR = new Uint8Array(
-				[1, ...addressRemote.split('.').map(Number)]
-			);
-			break;
-		case 3:
-			DSTADDR = new Uint8Array(
-				[3, addressRemote.length, ...encoder.encode(addressRemote)]
-			);
-			break;
-		case 4:
-			DSTADDR = new Uint8Array(
-				[4, ...addressRemote.split(':').flatMap(x => [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2), 16)])]
-			);
-			break;
-		default:
-			log(`invild  addressType is ${addressType}`);
-			return;
-	}
-	const socksRequest = new Uint8Array([5, 1, 0, ...DSTADDR, portRemote >> 8, portRemote & 0xff]);
-	await writer.write(socksRequest);
-	log('sent socks request');
-
-	res = (await reader.read()).value;
-	// Response format (Socks Server -> Worker):
-	//  +----+-----+-------+------+----------+----------+
-	// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
-	// +----+-----+-------+------+----------+----------+
-	// | 1  |  1  | X'00' |  1   | Variable |	2	 |
-	// +----+-----+-------+------+----------+----------+
-	if (res[1] === 0x00) {
-		log("socks connection opened");
-	} else {
-		log("fail to open socks connection");
-		return;
-	}
-	writer.releaseLock();
-	reader.releaseLock();
-	return socket;
-}
-
-
-/**
- * 
- * @param {string} address
- */
-function socks5AddressParser(address) {
-	let [latter, former] = address.split("@").reverse();
-	let username, password, hostname, port;
-	if (former) {
-		const formers = former.split(":");
-		if (formers.length !== 2) {
-			throw new Error('Invalid SOCKS address format');
-		}
-		[username, password] = formers;
-	}
-	const latters = latter.split(":");
-	port = Number(latters.pop());
-	if (isNaN(port)) {
-		throw new Error('Invalid SOCKS address format');
-	}
-	hostname = latters.join(":");
-	const regex = /^\[.*\]$/;
-	if (hostname.includes(":") && !regex.test(hostname)) {
-		throw new Error('Invalid SOCKS address format');
-	}
-	//if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(hostname)) hostname = `${atob('d3d3Lg==')}${hostname}${atob('LmlwLjA5MDIyNy54eXo=')}`;
-	return {
-		username,
-		password,
-		hostname,
-		port,
-	}
-}
-
-function isValidIPv4(address) {
-	const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-	return ipv4Regex.test(address);
-}

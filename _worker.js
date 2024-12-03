@@ -1826,17 +1826,18 @@ function surge(content, url) {
 		const sha224 = createSha224();
 
 		if (COMMON_JS) {
-		module.exports = {
-			sha224: sha224
-		};
-		} else {
-		root.sha224 = sha224;
-		if (AMD) {
-			define(function () {
-			return {
-				sha224: sha224
+			module.exports = {
+				sha224
 			};
-			});
+		} else {
+			root.sha224 = sha224;
+			if (AMD) {
+				define(function () {
+					return {
+						sha224: sha224
+					};
+				});
+			}
 		}
-		}
-	})();
+	}
+)();

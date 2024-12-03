@@ -1285,9 +1285,9 @@ async function getAddressescsv(tls) {
 	return newAddressescsv;
 }
 
-function sha224(uilmc) {
+function sha224(输入字符串) {
 	// 内部常量和函数
-	const K = [
+	const 常量K = [
 		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
 		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -1298,73 +1298,73 @@ function sha224(uilmc) {
 		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 	];
 
-	function utf8Encode(str) {
-		return unescape(encodeURIComponent(str));
+	function utf8编码(字符串) {
+		return unescape(encodeURIComponent(字符串));
 	}
 
-	function bytesToHex(bytes) {
-		let hex = '';
-		for (let i = 0; i < bytes.length; i++) {
-			hex += ((bytes[i] >>> 4) & 0x0F).toString(16);
-			hex += (bytes[i] & 0x0F).toString(16);
+	function 字节转十六进制(字节数组) {
+		let 十六进制 = '';
+		for (let i = 0; i < 字节数组.length; i++) {
+			十六进制 += ((字节数组[i] >>> 4) & 0x0F).toString(16);
+			十六进制 += (字节数组[i] & 0x0F).toString(16);
 		}
-		return hex;
+		return 十六进制;
 	}
 
-	function sha224Core(uilmc) {
+	function sha224核心(输入字符串) {
 		// SHA-224的初始哈希值
-		let h = [
+		let 哈希值 = [
 			0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939,
 			0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4
 		];
 
 		// 预处理
-		const msgLen = uilmc.length * 8;
-		uilmc += String.fromCharCode(0x80);
-		while ((uilmc.length * 8) % 512 !== 448) {
-			uilmc += String.fromCharCode(0);
+		const 消息长度 = 输入字符串.length * 8;
+		输入字符串 += String.fromCharCode(0x80);
+		while ((输入字符串.length * 8) % 512 !== 448) {
+			输入字符串 += String.fromCharCode(0);
 		}
 
 		// 64位消息长度
-		const msgLenHigh = Math.floor(msgLen / 0x100000000);
-		const msgLenLow = msgLen & 0xFFFFFFFF;
-		uilmc += String.fromCharCode(
-			(msgLenHigh >>> 24) & 0xFF, (msgLenHigh >>> 16) & 0xFF,
-			(msgLenHigh >>> 8) & 0xFF, msgLenHigh & 0xFF,
-			(msgLenLow >>> 24) & 0xFF, (msgLenLow >>> 16) & 0xFF,
-			(msgLenLow >>> 8) & 0xFF, msgLenLow & 0xFF
+		const 消息长度高位 = Math.floor(消息长度 / 0x100000000);
+		const 消息长度低位 = 消息长度 & 0xFFFFFFFF;
+		输入字符串 += String.fromCharCode(
+			(消息长度高位 >>> 24) & 0xFF, (消息长度高位 >>> 16) & 0xFF,
+			(消息长度高位 >>> 8) & 0xFF, 消息长度高位 & 0xFF,
+			(消息长度低位 >>> 24) & 0xFF, (消息长度低位 >>> 16) & 0xFF,
+			(消息长度低位 >>> 8) & 0xFF, 消息长度低位 & 0xFF
 		);
 
-		const words = [];
-		for (let i = 0; i < uilmc.length; i += 4) {
-			words.push(
-				(uilmc.charCodeAt(i) << 24) |
-				(uilmc.charCodeAt(i + 1) << 16) |
-				(uilmc.charCodeAt(i + 2) << 8) |
-				uilmc.charCodeAt(i + 3)
+		const 字数组 = [];
+		for (let i = 0; i < 输入字符串.length; i += 4) {
+			字数组.push(
+				(输入字符串.charCodeAt(i) << 24) |
+				(输入字符串.charCodeAt(i + 1) << 16) |
+				(输入字符串.charCodeAt(i + 2) << 8) |
+				输入字符串.charCodeAt(i + 3)
 			);
 		}
 
 		// 主要压缩循环
-		for (let i = 0; i < words.length; i += 16) {
+		for (let i = 0; i < 字数组.length; i += 16) {
 			const w = new Array(64).fill(0);
 			for (let j = 0; j < 16; j++) {
-				w[j] = words[i + j];
+				w[j] = 字数组[i + j];
 			}
 
 			for (let j = 16; j < 64; j++) {
-				const s0 = rightRotate(w[j-15], 7) ^ rightRotate(w[j-15], 18) ^ (w[j-15] >>> 3);
-				const s1 = rightRotate(w[j-2], 17) ^ rightRotate(w[j-2], 19) ^ (w[j-2] >>> 10);
+				const s0 = 右旋转(w[j-15], 7) ^ 右旋转(w[j-15], 18) ^ (w[j-15] >>> 3);
+				const s1 = 右旋转(w[j-2], 17) ^ 右旋转(w[j-2], 19) ^ (w[j-2] >>> 10);
 				w[j] = (w[j-16] + s0 + w[j-7] + s1) >>> 0;
 			}
 
-			let [a, b, c, d, e, f, g, h0] = h;
+			let [a, b, c, d, e, f, g, h0] = 哈希值;
 
 			for (let j = 0; j < 64; j++) {
-				const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+				const S1 = 右旋转(e, 6) ^ 右旋转(e, 11) ^ 右旋转(e, 25);
 				const ch = (e & f) ^ (~e & g);
-				const temp1 = (h0 + S1 + ch + K[j] + w[j]) >>> 0;
-				const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+				const temp1 = (h0 + S1 + ch + 常量K[j] + w[j]) >>> 0;
+				const S0 = 右旋转(a, 2) ^ 右旋转(a, 13) ^ 右旋转(a, 22);
 				const maj = (a & b) ^ (a & c) ^ (b & c);
 				const temp2 = (S0 + maj) >>> 0;
 
@@ -1378,31 +1378,31 @@ function sha224(uilmc) {
 				a = (temp1 + temp2) >>> 0;
 			}
 
-			h[0] = (h[0] + a) >>> 0;
-			h[1] = (h[1] + b) >>> 0;
-			h[2] = (h[2] + c) >>> 0;
-			h[3] = (h[3] + d) >>> 0;
-			h[4] = (h[4] + e) >>> 0;
-			h[5] = (h[5] + f) >>> 0;
-			h[6] = (h[6] + g) >>> 0;
-			h[7] = (h[7] + h0) >>> 0;
+			哈希值[0] = (哈希值[0] + a) >>> 0;
+			哈希值[1] = (哈希值[1] + b) >>> 0;
+			哈希值[2] = (哈希值[2] + c) >>> 0;
+			哈希值[3] = (哈希值[3] + d) >>> 0;
+			哈希值[4] = (哈希值[4] + e) >>> 0;
+			哈希值[5] = (哈希值[5] + f) >>> 0;
+			哈希值[6] = (哈希值[6] + g) >>> 0;
+			哈希值[7] = (哈希值[7] + h0) >>> 0;
 		}
 
 		// 截断到224位
-		return h.slice(0, 7);
+		return 哈希值.slice(0, 7);
 	}
 
-	function rightRotate(n, d) {
-		return ((n >>> d) | (n << (32 - d))) >>> 0;
+	function 右旋转(数值, 位数) {
+		return ((数值 >>> 位数) | (数值 << (32 - 位数))) >>> 0;
 	}
 
 	// 主函数逻辑
-	const input = utf8Encode(uilmc);
-	const hash = sha224Core(input);
+	const 编码输入 = utf8编码(输入字符串);
+	const 哈希结果 = sha224核心(编码输入);
 	
 	// 转换为十六进制字符串
-	return bytesToHex(
-		hash.flatMap(h => [
+	return 字节转十六进制(
+		哈希结果.flatMap(h => [
 			(h >>> 24) & 0xFF, 
 			(h >>> 16) & 0xFF, 
 			(h >>> 8) & 0xFF, 

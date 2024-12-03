@@ -1318,7 +1318,7 @@ function surge(content, url) {
  * @copyright Chen, Yi-Cyuan 2014-2024
  * @license MIT
  * 
- * @modifications 重写并实现了 sha224 函数，修改日期：2024-12-04，Github：cmliu
+ * @modifications 重写并实现了 sha224 函数，引用请注明出处。修改日期：2024-12-04，Github：cmliu
  */
 function sha224(输入字符串) {
 	// 内部常量和函数

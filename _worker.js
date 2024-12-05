@@ -27,6 +27,7 @@ let addresses = [];
 let addressesapi = [];
 let addressescsv = [];
 let DLS = 8;
+let remarkIndex = 1;//CSV备注所在列偏移量
 let FileName = 'epeius';
 let BotToken ='';
 let ChatID =''; 
@@ -107,6 +108,7 @@ export default {
 			if (env.ADDAPI) addressesapi = await ADD(env.ADDAPI);
 			if (env.ADDCSV) addressescsv = await ADD(env.ADDCSV);
 			DLS = env.DLS || DLS;
+			remarkIndex = env.CSVREMARK || remarkIndex;
 			BotToken = env.TGTOKEN || BotToken;
 			ChatID = env.TGID || ChatID; 
 			if(env.GO2SOCKS5) go2Socks5s = await ADD(env.GO2SOCKS5);
@@ -136,11 +138,11 @@ export default {
 						},
 					});
 				case `/${fakeUserID}`:
-					const fakeConfig = await getTrojanConfig(password, request.headers.get('Host'), sub, 'CF-Workers-SUB', RproxyIP, url);
+					const fakeConfig = await get特洛伊Config(password, request.headers.get('Host'), sub, 'CF-Workers-SUB', RproxyIP, url);
 					return new Response(`${fakeConfig}`, { status: 200 });
 				case `/${password}`:
 					await sendMessage(`#获取订阅 ${FileName}`, request.headers.get('CF-Connecting-IP'), `UA: ${UA}</tg-spoiler>\n域名: ${url.hostname}\n<tg-spoiler>入口: ${url.pathname + url.search}</tg-spoiler>`);
-					const trojanConfig = await getTrojanConfig(password, request.headers.get('Host'), sub, UA, RproxyIP, url);
+					const 特洛伊Config = await get特洛伊Config(password, request.headers.get('Host'), sub, UA, RproxyIP, url);
 					const now = Date.now();
 					//const timestamp = Math.floor(now / 1000);
 					const today = new Date(now);
@@ -151,7 +153,7 @@ export default {
 					let total = 24 * 1099511627776 ;
 
 					if (userAgent && (userAgent.includes('mozilla') || userAgent.includes('subconverter'))){
-						return new Response(`${trojanConfig}`, {
+						return new Response(`${特洛伊Config}`, {
 							status: 200,
 							headers: {
 								"Content-Type": "text/plain;charset=utf-8",
@@ -160,7 +162,7 @@ export default {
 							}
 						});
 					} else {
-						return new Response(`${trojanConfig}`, {
+						return new Response(`${特洛伊Config}`, {
 							status: 200,
 							headers: {
 								"Content-Disposition": `attachment; filename=${FileName}; filename*=utf-8''${encodeURIComponent(FileName)}`,
@@ -213,7 +215,7 @@ export default {
 					enableSocks = false;
 				}
 
-				return await trojanOverWSHandler(request);
+				return await 特洛伊OverWSHandler(request);
 			}
 		} catch (err) {
 			let e = err;
@@ -222,7 +224,7 @@ export default {
 	}
 };
 
-async function trojanOverWSHandler(request) {
+async function 特洛伊OverWSHandler(request) {
 	const webSocketPair = new WebSocketPair();
 	const [client, webSocket] = Object.values(webSocketPair);
 	webSocket.accept();
@@ -255,7 +257,7 @@ async function trojanOverWSHandler(request) {
 				addressRemote = "",
 				rawClientData,
 				addressType
-			} = await parseTrojanHeader(chunk);
+			} = await parse特洛伊Header(chunk);
 			address = addressRemote;
 			portWithRandomLog = `${portRemote}--${Math.random()} tcp`;
 			if (hasError) {
@@ -280,7 +282,7 @@ async function trojanOverWSHandler(request) {
 	});
 }
 
-async function parseTrojanHeader(buffer) {
+async function parse特洛伊Header(buffer) {
 	if (buffer.byteLength < 56) {
 		return {
 			hasError: true,
@@ -645,13 +647,13 @@ function 配置信息(密码, 域名地址) {
 }
 
 let subParams = ['sub','base64','b64','clash','singbox','sb','surge'];
-async function getTrojanConfig(password, hostName, sub, UA, RproxyIP, _url) {
+async function get特洛伊Config(password, hostName, sub, UA, RproxyIP, _url) {
 	if (sub) {
 		const match = sub.match(/^(?:https?:\/\/)?([^\/]+)/);
 		if (match) {
 			sub = match[1];
 		}
-		const subs = ADD(sub);
+		const subs = await ADD(sub);
 		if (subs.length > 1) sub = subs[0];
 
 	} else if ((addresses.length + addressesapi.length + addressescsv.length) == 0){
@@ -1147,9 +1149,9 @@ function subAddresses(host,pw,userAgent,newAddressesapi,newAddressescsv) {
 
 		const 啥啥啥_写的这是啥啊 = 'dHJvamFu';
 		const 协议类型 = atob(啥啥啥_写的这是啥啊);
-		const trojanLink = `${协议类型}://${密码}@${address}:${port}?security=tls&sni=${伪装域名}&fp=randomized&type=ws&host=${伪装域名}&path=${encodeURIComponent(最终路径)}#${encodeURIComponent(addressid + 节点备注)}`;
+		const 特洛伊Link = `${协议类型}://${密码}@${address}:${port}?security=tls&sni=${伪装域名}&fp=randomized&type=ws&host=${伪装域名}&path=${encodeURIComponent(最终路径)}#${encodeURIComponent(addressid + 节点备注)}`;
 
-		return trojanLink;
+		return 特洛伊Link;
 	}).join('\n');
 
 	const base64Response = btoa(responseBody); // 重新进行 Base64 编码
@@ -1188,24 +1190,42 @@ async function getAddressesapi(api) {
 				// 获取响应的内容
 				const content = await response.value;
 
-				// 验证当前apiUrl是否带有'proxyip=true'
-				if (api[index].includes('proxyip=true')) {
-					// 如果URL带有'proxyip=true'，则将内容添加到proxyIPPool
-					proxyIPPool = proxyIPPool.concat((await ADD(content)).map(item => {
-						const baseItem = item.split('#')[0] || item;
-						if (baseItem.includes(':')) {
-							const port = baseItem.split(':')[1];
-							if (!httpsPorts.includes(port)) {
-								return baseItem;
-							}
-						} else {
-							return `${baseItem}:443`;
+				const lines = content.split(/\r?\n/);
+				let 节点备注 = '';
+				let 测速端口 = '443';
+				if (lines[0].split(',').length > 3){
+					const idMatch = api[index].match(/id=([^&]*)/);
+					if (idMatch) 节点备注 = idMatch[1];
+					const portMatch = api[index].match(/port=([^&]*)/);
+					if (portMatch) 测速端口 = portMatch[1];
+					
+					for (let i = 1; i < lines.length; i++) {
+						const columns = lines[i].split(',')[0];
+						if(columns){
+							newapi += `${columns}:${测速端口}${节点备注 ? `#${节点备注}` : ''}\n`;
+							if (api[index].includes('proxyip=true')) proxyIPPool.push(`${columns}:${测速端口}`);
 						}
-						return null; // 不符合条件时返回 null
-					}).filter(Boolean)); // 过滤掉 null 值
+					}
+				} else {
+					// 验证当前apiUrl是否带有'proxyip=true'
+					if (api[index].includes('proxyip=true')) {
+						// 如果URL带有'proxyip=true'，则将内容添加到proxyIPPool
+						proxyIPPool = proxyIPPool.concat((await ADD(content)).map(item => {
+							const baseItem = item.split('#')[0] || item;
+							if (baseItem.includes(':')) {
+								const port = baseItem.split(':')[1];
+								if (!httpsPorts.includes(port)) {
+									return baseItem;
+								}
+							} else {
+								return `${baseItem}:443`;
+							}
+							return null; // 不符合条件时返回 null
+						}).filter(Boolean)); // 过滤掉 null 值
+					}
+					// 将内容添加到newapi中
+					newapi += content + '\n';
 				}
-				// 将内容添加到newapi中
-				newapi += content + '\n';
 			}
 		}
 	} catch (error) {
@@ -1251,7 +1271,7 @@ async function getAddressescsv(tls) {
 			
 			const ipAddressIndex = 0;// IP地址在 CSV 头部的位置
 			const portIndex = 1;// 端口在 CSV 头部的位置
-			const dataCenterIndex = tlsIndex + 1; // 数据中心是 TLS 的后一个字段
+			const dataCenterIndex = tlsIndex + remarkIndex; // 数据中心是 TLS 的后一个字段
 		
 			if (tlsIndex === -1) {
 				console.error('CSV文件缺少必需的字段');
@@ -1295,10 +1315,10 @@ function surge(content, url) {
 
 	let 输出内容 = "";
 	for (let x of 每行内容) {
-		if (x.includes('= trojan,')) {
+		if (x.includes(atob('PSB0cm9qYW4s'))) {
 			const host = x.split("sni=")[1].split(",")[0];
 			const 备改内容 = `skip-cert-verify=true, tfo=false, udp-relay=false`;
-			const 正确内容 = `skip-cert-verify=true, ws=true, ws-path=/?ed=2560, ws-headers=Host:"${host}", tfo=false, udp-relay=false`;
+			const 正确内容 = `skip-cert-verify=true, ws=true, ws-path=${path}, ws-headers=Host:"${host}", tfo=false, udp-relay=false`;
 			输出内容 += x.replace(new RegExp(备改内容, 'g'), 正确内容).replace("[", "").replace("]", "") + '\n';
 		} else {
 			输出内容 += x + '\n';
